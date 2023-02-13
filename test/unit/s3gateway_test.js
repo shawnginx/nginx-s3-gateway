@@ -371,15 +371,15 @@ function testEscapeURIPathPreservesDoubleSlashes() {
 function testReadCredentialsWithAccessAndSecretKeySet() {
     printHeader('testReadCredentialsWithAccessAndSecretKeySet');
     let r = {};
-    process.env['S3_ACCESS_KEY_ID'] = 'SOME_ACCESS_KEY';
-    process.env['S3_SECRET_KEY'] = 'SOME_SECRET_KEY';
+    process.env['AWS_ACCESS_KEY_ID'] = 'SOME_ACCESS_KEY';
+    process.env['AWS_SECRET_ACCESS_KEY'] = 'SOME_SECRET_KEY';
 
     try {
         var credentials = s3gateway.readCredentials(r);
-        if (credentials.accessKeyId !== process.env['S3_ACCESS_KEY_ID']) {
+        if (credentials.accessKeyId !== process.env['AWS_ACCESS_KEY_ID']) {
             throw 'static credentials do not match returned value [accessKeyId]';
         }
-        if (credentials.secretAccessKey !== process.env['S3_SECRET_KEY']) {
+        if (credentials.secretAccessKey !== process.env['AWS_SECRET_ACCESS_KEY']) {
             throw 'static credentials do not match returned value [secretAccessKey]';
         }
         if (credentials.sessionToken !== null) {
@@ -390,8 +390,8 @@ function testReadCredentialsWithAccessAndSecretKeySet() {
         }
 
     } finally {
-        delete process.env.S3_ACCESS_KEY_ID;
-        delete process.env.S3_SECRET_KEY;
+        delete process.env.AWS_ACCESS_KEY_ID;
+        delete process.env.AWS_SECRET_ACCESS_KEY;
     }
 }
 
@@ -469,10 +469,10 @@ function testReadCredentialsFromNonexistentPath() {
 function testReadAndWriteCredentialsFromKeyValStore() {
     printHeader('testReadAndWriteCredentialsFromKeyValStore');
 
-    let accessKeyId = process.env['S3_ACCESS_KEY_ID'];
-    let secretKey = process.env['S3_SECRET_KEY'];
-    delete process.env.S3_ACCESS_KEY_ID;
-    delete process.env.S3_SECRET_KEY;
+    let accessKeyId = process.env['AWS_ACCESS_KEY_ID'];
+    let secretKey = process.env['AWS_SECRET_ACCESS_KEY'];
+    delete process.env.AWS_ACCESS_KEY_ID;
+    delete process.env.AWS_SECRET_ACCESS_KEY;
 
     try {
         let r = {
@@ -498,14 +498,14 @@ function testReadAndWriteCredentialsFromKeyValStore() {
             throw 'Credentials do not match expected value';
         }
     } finally {
-        process.env['S3_ACCESS_KEY_ID'] = accessKeyId;
-        process.env['S3_SECRET_KEY'] = secretKey;
+        process.env['AWS_ACCESS_KEY_ID'] = accessKeyId;
+        process.env['AWS_SECRET_ACCESS_KEY'] = secretKey;
     }
 }
 
 async function testEcsCredentialRetrieval() {
     printHeader('testEcsCredentialRetrieval');
-    process.env['S3_ACCESS_KEY_ID'] = undefined;
+    process.env['AWS_ACCESS_KEY_ID'] = undefined;
     process.env['AWS_CONTAINER_CREDENTIALS_RELATIVE_URI'] = '/example';
     globalThis.ngx.fetch = function (url) {
         globalThis.recordedUrl = url;
@@ -552,7 +552,7 @@ async function testEcsCredentialRetrieval() {
 
 async function testEc2CredentialRetrieval() {
     printHeader('testEc2CredentialRetrieval');
-    process.env['S3_ACCESS_KEY_ID'] = undefined;
+    process.env['AWS_ACCESS_KEY_ID'] = undefined;
     process.env['AWS_CONTAINER_CREDENTIALS_RELATIVE_URI'] = undefined;
     globalThis.ngx.fetch = function (url, options) {
         if (url === 'http://169.254.169.254/latest/api/token' && options && options.method === 'PUT') {

@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 
+LAMBDA_SERVER=lambda.us-east-2.amazonaws.com
+LAMBDA_REGION=us-east-2
+LAMBDA_SERVER_PROTO=https
+
 S3_BUCKET_NAME=nginx-0206
 S3_SERVER=s3-us-east-2.amazonaws.com
 S3_SERVER_PORT=443
 S3_SERVER_PROTO=https
 S3_REGION=us-east-2
 S3_STYLE=virtual
-S3_DEBUG=true
+AWS_DEBUG=true
 AWS_SIGS_VERSION=4
 ALLOW_DIRECTORY_LIST=true
 PROVIDE_INDEX_PAGE=true
@@ -48,7 +52,7 @@ fi
 failed=0
 
 required=("S3_BUCKET_NAME" "S3_SERVER" "S3_SERVER_PORT" "S3_SERVER_PROTO"
-"S3_REGION" "S3_STYLE" "ALLOW_DIRECTORY_LIST" "AWS_SIGS_VERSION")
+"S3_REGION" "S3_STYLE" "ALLOW_DIRECTORY_LIST" "AWS_SIGS_VERSION" "LAMBDA_SERVER" "LAMBDA_REGION")
 
 if [ ! -z ${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI+x} ]; then
   echo "Running inside an ECS task, using container credentials"
@@ -57,7 +61,7 @@ elif curl --output /dev/null --silent --head --fail --connect-timeout 2 "http://
   echo "Running inside an EC2 instance, using IMDS for credentials"
   uses_iam_creds=1
 else
-  required+=("S3_ACCESS_KEY_ID" "S3_SECRET_KEY")
+  required+=("AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY")
   uses_iam_creds=0
 fi
 
@@ -91,7 +95,7 @@ echo "Installing using github '${branch}' branch"
 
 
 echo "S3 Backend Environment"
-echo "Access Key ID: ${S3_ACCESS_KEY_ID}"
+echo "Access Key ID: ${AWS_ACCESS_KEY_ID}"
 echo "Origin: ${S3_SERVER_PROTO}://${S3_BUCKET_NAME}.${S3_SERVER}:${S3_SERVER_PORT}"
 echo "Region: ${S3_REGION}"
 echo "Addressing Style: ${S3_STYLE}"
@@ -157,17 +161,42 @@ S3_SERVER=${S3_SERVER}
 # The S3 host/path method - 'virtual', 'path' or 'default'
 S3_STYLE=${S3_STYLE}
 # Flag (true/false) enabling AWS signatures debug output (default: false)
-S3_DEBUG=${S3_DEBUG}
+AWS_DEBUG=${AWS_DEBUG}
+PROXY_CACHE_VALID_OK=${PROXY_CACHE_VALID_OK}
+PROXY_CACHE_VALID_NOTFOUND=${PROXY_CACHE_VALID_NOTFOUND}
+PROXY_CACHE_VALID_FORBIDDEN=${PROXY_CACHE_VALID_FORBIDDEN}
+CORS_ENABLED=${CORS_ENABLED}
+LAMBDA_SERVER=${LAMBDA_SERVER}
+LAMBDA_REGION=${LAMBDA_REGION}
 EOF
+
+# By enabling CORS, we also need to enable the OPTIONS method which
+# is not normally used as part of the gateway. The following variable
+# defines the set of acceptable headers.
+if [ "${CORS_ENABLED}" == "1" ]; then
+    cat >> "/etc/nginx/environment" << EOF
+LIMIT_METHODS_TO="GET HEAD OPTIONS"
+LIMIT_METHODS_TO_CSV="GET, HEAD, OPTIONS"
+EOF
+else
+    cat >> "/etc/nginx/environment" << EOF
+LIMIT_METHODS_TO="GET HEAD"
+LIMIT_METHODS_TO_CSV="GET, HEAD"
+EOF
+fi
+
+if [ -z "${CORS_ALLOWED_ORIGIN+x}" ]; then
+CORS_ALLOWED_ORIGIN="*"
+fi
 
 # Only include these env vars if we are not using a instance profile credential
 # to obtain S3 permissions.
 if [ $uses_iam_creds -eq 0 ]; then
   cat >> "/etc/nginx/environment" << EOF
 # AWS Access key
-S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 # AWS Secret access key
-S3_SECRET_KEY=${S3_SECRET_KEY}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
 fi
 
@@ -265,8 +294,8 @@ EOF
 # to obtain S3 permissions.
 if [ $uses_iam_creds -eq 0 ]; then
   cat >> "/etc/nginx/environment" << EOF
-env S3_ACCESS_KEY_ID;
-env S3_SECRET_KEY;
+env AWS_ACCESS_KEY_ID;
+env AWS_SECRET_ACCESS_KEY;
 EOF
 fi
 
@@ -277,9 +306,12 @@ env S3_SERVER_PORT;
 env S3_SERVER_PROTO;
 env S3_REGION;
 env AWS_SIGS_VERSION;
-env S3_DEBUG;
+env AWS_DEBUG;
 env S3_STYLE;
 env ALLOW_DIRECTORY_LIST;
+
+env LAMBDA_SERVER;
+env LAMBDA_REGION;
 
 events {
     worker_connections  1024;
@@ -316,7 +348,9 @@ http {
 EOF
 
 download "common/etc/nginx/include/listing.xsl" "/etc/nginx/include/listing.xsl"
+download "common/etc/nginx/include/aws_common.js" "/etc/nginx/include/aws_common.js"
 download "common/etc/nginx/include/s3gateway.js" "/etc/nginx/include/s3gateway.js"
+download "common/etc/nginx/include/lambda_gateway.js" "/etc/nginx/include/lambda_gateway.js"
 download "common/etc/nginx/templates/default.conf.template" "/etc/nginx/templates/default.conf.template"
 download "common/etc/nginx/templates/gateway/v2_headers.conf.template" "/etc/nginx/templates/gateway/v2_headers.conf.template"
 download "common/etc/nginx/templates/gateway/v2_js_vars.conf.template" "/etc/nginx/templates/gateway/v2_js_vars.conf.template"
@@ -327,6 +361,7 @@ download "oss/etc/nginx/conf.d/gateway/server_variables.conf" "/etc/nginx/conf.d
 download "common/etc/nginx/templates/gateway/cors.conf.template" "/etc/nginx/templates/gateway/cors.conf.template"
 download "common/etc/nginx/templates/gateway/js_fetch_trusted_certificate.conf.template" "/etc/nginx/templates/gateway/js_fetch_trusted_certificate.conf.template"
 download "common/etc/nginx/templates/gateway/s3listing_location.conf.template" "/etc/nginx/templates/gateway/s3listing_location.conf.template"
+download "common/etc/nginx/templates/gateway/s3_location.conf.template" "/etc/nginx/templates/gateway/s3_location.conf.template"
 download "common/etc/nginx/templates/gateway/s3_server.conf.template" "/etc/nginx/templates/gateway/s3_server.conf.template"
 
 echo "▶ Creating directory for proxy cache"

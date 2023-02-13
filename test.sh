@@ -272,10 +272,10 @@ MSYS_NO_PATHCONV=1 "${docker_cmd}" run \
   --rm \
   -v "$(pwd)/test/unit:/var/tmp" \
   --workdir /var/tmp \
-  -e "S3_DEBUG=true" \
+  -e "AWS_DEBUG=true" \
   -e "S3_STYLE=virtual" \
-  -e "S3_ACCESS_KEY_ID=unit_test" \
-  -e "S3_SECRET_KEY=unit_test" \
+  -e "AWS_ACCESS_KEY_ID=unit_test" \
+  -e "AWS_SECRET_ACCESS_KEY=unit_test" \
   -e "S3_BUCKET_NAME=unit_test" \
   -e "S3_SERVER=unit_test" \
   -e "S3_SERVER_PROTO=https" \
