@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+LAMBDA_SERVER=lambda.us-east-2.amazonaws.com
+LAMBDA_REGION=us-east-2
+LAMBDA_SERVER_PROTO=https
+
 S3_BUCKET_NAME=nginx-0206
 S3_SERVER=s3-us-east-2.amazonaws.com
 S3_SERVER_PORT=443
@@ -48,7 +52,7 @@ fi
 failed=0
 
 required=("S3_BUCKET_NAME" "S3_SERVER" "S3_SERVER_PORT" "S3_SERVER_PROTO"
-"S3_REGION" "S3_STYLE" "ALLOW_DIRECTORY_LIST" "AWS_SIGS_VERSION")
+"S3_REGION" "S3_STYLE" "ALLOW_DIRECTORY_LIST" "AWS_SIGS_VERSION" "LAMBDA_SERVER" "LAMBDA_REGION")
 
 if [ ! -z ${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI+x} ]; then
   echo "Running inside an ECS task, using container credentials"
@@ -162,6 +166,8 @@ PROXY_CACHE_VALID_OK=${PROXY_CACHE_VALID_OK}
 PROXY_CACHE_VALID_NOTFOUND=${PROXY_CACHE_VALID_NOTFOUND}
 PROXY_CACHE_VALID_FORBIDDEN=${PROXY_CACHE_VALID_FORBIDDEN}
 CORS_ENABLED=${CORS_ENABLED}
+LAMBDA_SERVER=${LAMBDA_SERVER}
+LAMBDA_REGION=${LAMBDA_REGION}
 EOF
 
 # By enabling CORS, we also need to enable the OPTIONS method which
@@ -304,6 +310,9 @@ env AWS_DEBUG;
 env S3_STYLE;
 env ALLOW_DIRECTORY_LIST;
 
+env LAMBDA_SERVER;
+env LAMBDA_REGION;
+
 events {
     worker_connections  1024;
 }
@@ -339,8 +348,9 @@ http {
 EOF
 
 download "common/etc/nginx/include/listing.xsl" "/etc/nginx/include/listing.xsl"
-download "common/etc/nginx/include/s3gateway.js" "/etc/nginx/include/s3gateway.js"
 download "common/etc/nginx/include/aws_common.js" "/etc/nginx/include/aws_common.js"
+download "common/etc/nginx/include/s3gateway.js" "/etc/nginx/include/s3gateway.js"
+download "common/etc/nginx/include/lambda_gateway.js" "/etc/nginx/include/lambda_gateway.js"
 download "common/etc/nginx/templates/default.conf.template" "/etc/nginx/templates/default.conf.template"
 download "common/etc/nginx/templates/gateway/v2_headers.conf.template" "/etc/nginx/templates/gateway/v2_headers.conf.template"
 download "common/etc/nginx/templates/gateway/v2_js_vars.conf.template" "/etc/nginx/templates/gateway/v2_js_vars.conf.template"

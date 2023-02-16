@@ -169,7 +169,7 @@ function buildSigningKeyHash(kSecret, eightDigitDate, service, region) {
  * @returns {string} ISO 8601 timestamp
  */
 function awsHeaderDate(r) {
-    return signedDateTime(NOW, eightDigitDate(NOW));
+    return signedDateTime(NOW, _eightDigitDate(NOW));
 }
 
 /**
@@ -179,7 +179,7 @@ function awsHeaderDate(r) {
  * @returns {string} a formatted date string based on the input timestamp
  * @private
  */
-function eightDigitDate(timestamp) {
+function _eightDigitDate(timestamp) {
     const year = timestamp.getUTCFullYear();
     const month = timestamp.getUTCMonth() + 1;
     const day = timestamp.getUTCDate();
@@ -671,6 +671,7 @@ async function _fetchEcsRoleCredentials(credentialsUri) {
  * @param r {Request} HTTP request object
  * @param timestamp {Date} timestamp associated with request (must fall within a skew)
  * @param region {string} API region associated with request
+ * @param service {string} service code (for example, s3, lambda)
  * @param method {string} The HTTP method to create a canonical request
  * @param uri {string} The URI-encoded version of the absolute path component URL to create a canonical request
  * @param queryParams {string} The URL-encoded query string parameters to create a canonical request
@@ -679,16 +680,16 @@ async function _fetchEcsRoleCredentials(credentialsUri) {
  * @returns {string} HTTP Authorization header value
  */
 function signatureV4(
-    r, timestamp, region, method, uri, queryParams, host, credentials) {
-    const eightDigitDate = eightDigitDate(timestamp);
+    r, timestamp, region, service, method, uri, queryParams, host, credentials) {
+    const eightDigitDate = _eightDigitDate(timestamp);
     const amzDatetime = signedDateTime(timestamp, eightDigitDate);
     const canonicalRequest = buildCanonicalRequest(
         method, uri, queryParams, host, amzDatetime, credentials.sessionToken);
-    const signature = _buildSignatureV4(
-        r, amzDatetime, eightDigitDate, credentials, region, canonicalRequest);
+    const signature = _buildSignatureV4(r, amzDatetime, eightDigitDate,
+        credentials, region, service, canonicalRequest);
     const authHeader = 'AWS4-HMAC-SHA256 Credential='
         .concat(credentials.accessKeyId, '/', eightDigitDate, '/', region, '/',
-            SERVICE, '/aws4_request,', 'SignedHeaders=',
+            service, '/aws4_request,', 'SignedHeaders=',
             signedHeaders(credentials.sessionToken), ',Signature=', signature);
 
     debug_log(r, 'AWS v4 Auth header: [' + authHeader + ']');
@@ -705,23 +706,25 @@ function signatureV4(
  * @param creds {object} AWS credentials
  * @param eightDigitDate {string} date in the form of 'YYYYMMDD'
  * @param region {string} API region associated with request
+ * @param service {string} service code (for example, s3, lambda)
  * @param canonicalRequest {string} string with concatenated request parameters
  * @returns {string} hex encoded hash of signature HMAC value
  * @private
  */
 function _buildSignatureV4(
-    r, amzDatetime, eightDigitDate, creds, region, canonicalRequest) {
-    aws.debug_log(r, 'AWS v4 Auth Canonical Request: [' + canonicalRequest + ']');
+    r, amzDatetime, eightDigitDate, creds, region, service, canonicalRequest) {
+    debug_log(r, 'AWS v4 Auth Canonical Request: [' + canonicalRequest + ']');
 
     const canonicalRequestHash = mod_hmac.createHash('sha256')
         .update(canonicalRequest)
         .digest('hex');
 
-    aws.debug_log(r, 'AWS v4 Auth Canonical Request Hash: [' + canonicalRequestHash + ']');
+    debug_log(r, 'AWS v4 Auth Canonical Request Hash: [' + canonicalRequestHash + ']');
 
-    const stringToSign = aws.buildStringToSign(amzDatetime, eightDigitDate, region, SERVICE, canonicalRequestHash);
+    const stringToSign = buildStringToSign(
+        amzDatetime, eightDigitDate, region, service, canonicalRequestHash);
 
-    aws.debug_log(r, 'AWS v4 Auth Signing String: [' + stringToSign + ']');
+    debug_log(r, 'AWS v4 Auth Signing String: [' + stringToSign + ']');
 
     let kSigningHash;
 
@@ -734,13 +737,13 @@ function _buildSignatureV4(
     if ("variables" in r && r.variables.cache_signing_key_enabled == 1) {
         // cached value is in the format: [eightDigitDate]:[signingKeyHash]
         const cached = "signing_key_hash" in r.variables ? r.variables.signing_key_hash : "";
-        const fields = aws.splitCachedValues(cached);
+        const fields = splitCachedValues(cached);
         const cachedEightDigitDate = fields[0];
         const cacheIsValid = fields.length === 2 && eightDigitDate === cachedEightDigitDate;
 
         // If true, use cached value
         if (cacheIsValid) {
-            aws.debug_log(r, 'AWS v4 Using cached Signing Key Hash');
+            debug_log(r, 'AWS v4 Using cached Signing Key Hash');
             /* We are forced to JSON encode the string returned from the HMAC
              * operation because it is in a very specific format that include
              * binary data and in order to preserve that data when persisting
@@ -749,21 +752,21 @@ function _buildSignatureV4(
             kSigningHash = Buffer.from(JSON.parse(fields[1]));
         // Otherwise, generate a new signing key hash and store it in the cache
         } else {
-            kSigningHash = aws.buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
-            aws.debug_log(r, 'Writing key: ' + eightDigitDate + ':' + kSigningHash.toString('hex'));
+            kSigningHash = buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, service, region);
+            debug_log(r, 'Writing key: ' + eightDigitDate + ':' + kSigningHash.toString('hex'));
             r.variables.signing_key_hash = eightDigitDate + ':' + JSON.stringify(kSigningHash);
         }
     // Otherwise, don't use caching at all (like when we are using NGINX OSS)
     } else {
-        kSigningHash = aws.buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
+        kSigningHash = buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, service, region);
     }
 
-    aws.debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
+    debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
 
     const signature = mod_hmac.createHmac('sha256', kSigningHash)
         .update(stringToSign).digest('hex');
 
-    aws.debug_log(r, 'AWS v4 Authorization Header: [' + signature + ']');
+    debug_log(r, 'AWS v4 Authorization Header: [' + signature + ']');
 
     return signature;
 }
@@ -774,7 +777,6 @@ export default {
     buildSigningKeyHash,
     buildStringToSign,
     debug_log,
-    eightDigitDate,
     fetchCredentials,
     parseBoolean,
     readCredentials,
@@ -788,6 +790,7 @@ export default {
     // These functions do not need to be exposed, but they are exposed so that
     // unit tests can run against them.
     _credentialsTempFile,
+    _eightDigitDate,
     _fetchEC2RoleCredentials,
     _fetchWebIdentityCredentials,
     _padWithLeadingZeros,
