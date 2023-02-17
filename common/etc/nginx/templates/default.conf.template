@@ -20,9 +20,13 @@ map $S3_STYLE $s3_host_hdr {
 
 js_var $indexIsEmpty true;
 # This creates the HTTP authentication header to be sent to S3
-js_set $s3auth s3gateway.s3auth;
-js_set $s3SecurityToken s3gateway.s3SecurityToken;
-js_set $s3uri s3gateway.s3uri;
+js_set $s3auth              s3gateway.s3auth;
+js_set $s3SecurityToken     s3gateway.s3SecurityToken;
+js_set $s3uri               s3gateway.s3uri;
+
+js_set $lambdaAuth          lambda_gateway.lambdaAuth;
+js_set $lambdaSecurityToken lambda_gateway.lambdaSecurityToken;
+js_set $lambdaURI           lambda_gateway.lambdaURI;
 
 server {
     include /etc/nginx/conf.d/gateway/server_variables.conf;

@@ -56,7 +56,7 @@ const NOW = new Date();
  * Constant defining the service requests are being signed for.
  * @type {string}
  */
-const SERVICE = 's3';
+const SERVICE = 'lambda';
 
 /**
  * Constant checksum for an empty HTTP body.
@@ -306,26 +306,11 @@ function _readCredentialsFromFile() {
  * @param r {Request} HTTP request object
  * @returns {string} AWS authentication signature
  */
-function s3auth(r) {
-    const bucket = process.env['S3_BUCKET_NAME'];
-    const region = process.env['S3_REGION'];
-    let server;
-    if (S3_STYLE === 'path') {
-        server = process.env['S3_SERVER'] + ':' + process.env['S3_SERVER_PORT'];
-    } else {
-        server = process.env['S3_SERVER'];
-    }
-    const sigver = process.env['AWS_SIGS_VERSION'];
-
-    let signature;
-
+function lambdaAuth(r) {
+    const region = process.env['LAMBDA_REGION'];
+    let server = process.env['LAMBDA_SERVER'];
     const credentials = readCredentials(r);
-    if (sigver == '2') {
-        signature = signatureV2(r, bucket, credentials);
-    } else {
-        signature = signatureV4(r, NOW, bucket, region, server, credentials);
-    }
-
+    let signature = signatureV4(r, NOW, region, server, credentials);
     return signature;
 }
 
@@ -335,7 +320,7 @@ function s3auth(r) {
  * @param r {Request} HTTP request object (not used, but required for NGINX configuration)
  * @returns {string} current session token or empty string
  */
-function s3SecurityToken(r) {
+function lambdaSecurityToken(r) {
     const credentials = readCredentials(r);
     if (credentials.sessionToken) {
         return credentials.sessionToken;
@@ -371,27 +356,9 @@ function s3BaseUri(r) {
  * @param r HTTP request
  * @returns {string} uri for s3 request
  */
-function s3uri(r) {
+function lambdaURI(r) {
     let uriPath = r.variables.uri_path;
-    const basePath = s3BaseUri(r);
-    let path;
-
-    // Create query parameters only if directory listing is enabled.
-    if (ALLOW_LISTING) {
-        const queryParams = _s3DirQueryParams(uriPath, r.method);
-        if (queryParams.length > 0) {
-            path = basePath + '?' + queryParams;
-        } else {
-            path = _escapeURIPath(basePath + uriPath);
-        }
-    } else {
-        // This is a path that will resolve to an index page
-        if (PROVIDE_INDEX_PAGE  && _isDirectory(uriPath) ) {
-            uriPath += INDEX_PAGE;
-        }
-        path = _escapeURIPath(basePath + uriPath);
-    }
-
+    let path = _escapeURIPath(uriPath);
     _debug_log(r, 'S3 Request URI: ' + r.method + ' ' + path);
     return path;
 }
@@ -557,16 +524,16 @@ function signedHeaders(sessionToken) {
  *
  * @param r {Request} HTTP request object
  * @param timestamp {Date} timestamp associated with request (must fall within a skew)
- * @param bucket {string} S3 bucket associated with request
+
  * @param region {string} API region associated with request
  * @param server {string}
  * @param credentials {object} Credential object with AWS credentials in it (AccessKeyId, SecretAccessKey, SessionToken)
  * @returns {string} HTTP Authorization header value
  */
-function signatureV4(r, timestamp, bucket, region, server, credentials) {
+function signatureV4(r, timestamp, region, server, credentials) {
     const eightDigitDate = _eightDigitDate(timestamp);
     const amzDatetime = _amzDatetime(timestamp, eightDigitDate);
-    const signature = _buildSignatureV4(r, amzDatetime, eightDigitDate, credentials, bucket, region, server);
+    const signature = _buildSignatureV4(r, amzDatetime, eightDigitDate, credentials, region, server);
     const authHeader = 'AWS4-HMAC-SHA256 Credential='
         .concat(credentials.accessKeyId, '/', eightDigitDate, '/', region, '/', SERVICE, '/aws4_request,',
             'SignedHeaders=', signedHeaders(credentials.sessionToken), ',Signature=', signature);
@@ -588,24 +555,11 @@ function signatureV4(r, timestamp, bucket, region, server, credentials) {
  * @returns {string} hex encoded hash of signature HMAC value
  * @private
  */
-function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, bucket, region, server) {
+function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server) {
     let host = server;
-    if (S3_STYLE === 'virtual' || S3_STYLE === 'default' || S3_STYLE === undefined) {
-        host = bucket + '.' + host;
-    }
     const method = r.method;
-    const baseUri = s3BaseUri(r);
-    const queryParams = _s3DirQueryParams(r.variables.uri_path, method);
-    let uri;
-    if (queryParams.length > 0) {
-        if (baseUri.length > 0) {
-            uri = baseUri;
-        } else {
-            uri = '/';
-        }
-    } else {
-        uri = s3uri(r);
-    }
+    const queryParams = '';
+    let uri = lambdaURI(r);
 
     const canonicalRequest = _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, creds.sessionToken);
 
@@ -1168,9 +1122,9 @@ export default {
     readCredentials,
     writeCredentials,
     s3date,
-    s3auth,
-    s3SecurityToken,
-    s3uri,
+    lambdaAuth,
+    lambdaSecurityToken,
+    lambdaURI,
     trailslashControl,
     redirectToS3,
     editHeaders,

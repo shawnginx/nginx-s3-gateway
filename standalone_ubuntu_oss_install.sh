@@ -17,6 +17,9 @@ PROXY_CACHE_VALID_FORBIDDEN=30s
 CORS_ENABLED=false
 DNS_RESOLVERS=8.8.8.8
 
+LAMBDA_SERVER=lambda.us-east-2.amazonaws.com
+LAMBDA_REGION=us-east-2
+
 set -o errexit   # abort on nonzero exit status
 set -o pipefail  # don't hide errors within pipes
 
@@ -303,6 +306,9 @@ env AWS_SIGS_VERSION;
 env S3_DEBUG;
 env S3_STYLE;
 env ALLOW_DIRECTORY_LIST;
+
+env LAMBDA_SERVER;
+env LAMBDA_REGION;
 
 events {
     worker_connections  1024;
