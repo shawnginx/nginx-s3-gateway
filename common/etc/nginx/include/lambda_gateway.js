@@ -65,7 +65,8 @@ const EMPTY_PAYLOAD_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495
  * Constant defining the headers being signed.
  * @type {string}
  */
-const DEFAULT_SIGNED_HEADERS = 'host;x-amz-content-sha256;x-amz-date';
+//const DEFAULT_SIGNED_HEADERS = 'host;x-amz-content-sha256;x-amz-date';
+const DEFAULT_SIGNED_HEADERS = 'host;x-amz-date';
 
 /**
  * Constant base URI to fetch credentials together with the credentials relative URI, see
@@ -557,7 +558,7 @@ function _splitCachedValues(cached) {
 function _buildStringToSign(amzDatetime, eightDigitDate, region, canonicalRequestHash) {
     return 'AWS4-HMAC-SHA256\n' +
         amzDatetime + '\n' +
-        eightDigitDate + '/' + region + '/s3/aws4_request\n' +
+        eightDigitDate + '/' + region + '/' + SERVICE + '/aws4_request\n' +
         canonicalRequestHash;
 }
 
@@ -575,7 +576,7 @@ function _buildStringToSign(amzDatetime, eightDigitDate, region, canonicalReques
  */
 function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, sessionToken) {
     let canonicalHeaders = 'host:' + host + '\n' +
-        'x-amz-content-sha256:' + EMPTY_PAYLOAD_HASH + '\n' +
+        //'x-amz-content-sha256:' + EMPTY_PAYLOAD_HASH + '\n' +
         'x-amz-date:' + amzDatetime + '\n';
 
     if (sessionToken) {
