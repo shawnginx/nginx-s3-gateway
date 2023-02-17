@@ -187,7 +187,8 @@ server {
         #error_page 404 @trailslashControl;
 
         #proxy_pass ${S3_SERVER_PROTO}://storage_urls$s3uri;
-        proxy_pass https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0213/invocations;
+        proxy_pass ${LAMBDA_SERVER_PROTO}://lambda_urls$lambdaURI;
+        #proxy_pass https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0213/invocations;
 
         #include /etc/nginx/conf.d/gateway/s3_location.conf;
     }
