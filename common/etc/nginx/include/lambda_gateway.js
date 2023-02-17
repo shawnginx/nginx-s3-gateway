@@ -14,9 +14,9 @@
  *  limitations under the License.
  */
 
-_require_env_var('LAMBDA_PROTO');
+_require_env_var('LAMBDA_SERVER_PROTO');
 _require_env_var('LAMBDA_SERVER');
-_require_env_var('LAMBDA_PORT');
+_require_env_var('LAMBDA_SERVER_PORT');
 _require_env_var('LAMBDA_REGION');
 
 

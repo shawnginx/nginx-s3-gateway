@@ -29,6 +29,10 @@ js_set $lambdaSecurityToken lambda_gateway.lambdaSecurityToken;
 js_set $lambdaURI           lambda_gateway.lambdaURI;
 
 server {
+    # Enable when debugging is needed
+    error_log  /var/log/nginx/error.log  debug; # Reduce severity level as required
+    access_log /var/log/nginx/access.log main;
+
     include /etc/nginx/conf.d/gateway/server_variables.conf;
 
     # Don't display the NGINX version number because we don't want to reveal
@@ -87,12 +91,12 @@ server {
         # Redirect to the proper location based on the client request - either
         # @s3, @s3Listing or @error405.
 
-        js_content s3gateway.redirectToLambda;
+        js_content lambda_gateway.redirectToLambda;
     }
 
     location /aws/credentials/retrieve {
         internal;
-        js_content s3gateway.fetchCredentials;
+        js_content lambda_gateway.fetchCredentials;
 
         include /etc/nginx/conf.d/gateway/js_fetch_trusted_certificate.conf;
     }
