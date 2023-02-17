@@ -176,6 +176,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Connection '';
 
+        proxy_method POST;
+
         # We strip off all of the AWS specific headers from the server so that
         # there is nothing identifying the object as having originated in an
         # object store.

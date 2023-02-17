@@ -334,39 +334,7 @@ function lambdaSecurityToken(r) {
 function lambdaURI(r) {
     let uriPath = r.variables.uri_path;
     let path = _escapeURIPath(uriPath);
-    _debug_log(r, 'S3 Request URI: ' + r.method + ' ' + path);
-    return path;
-}
-
-/**
- * Create and encode the query parameters needed to query S3 for an object
- * listing.
- *
- * @param uriPath request URI path
- * @param method request HTTP method
- * @returns {string} query parameters to use with S3 request
- * @private
- */
-function _s3DirQueryParams(uriPath, method) {
-    if (!_isDirectory(uriPath) || method !== 'GET') {
-        return '';
-    }
-
-    /* Return if static website. We don't want to list the files in the
-       directory, we want to append the index page and get the fil. */
-    if (PROVIDE_INDEX_PAGE){
-        return '';
-    }
-
-    let path = 'delimiter=%2F'
-
-    if (uriPath !== '/') {
-        let decodedUriPath = decodeURIComponent(uriPath);
-        let without_leading_slash = decodedUriPath.charAt(0) === '/' ?
-            decodedUriPath.substring(1, decodedUriPath.length) : decodedUriPath;
-        path += '&prefix=' + _encodeURIComponent(without_leading_slash);
-    }
-
+    _debug_log(r, 'Lambda Request URI: ' + r.method + ' ' + path);
     return path;
 }
 
@@ -395,39 +363,6 @@ function trailslashControl(r) {
         }
     }
         r.internalRedirect("@error404");
-}
-
-/**
- * Create HTTP Authorization header for authenticating with an AWS compatible
- * v2 API.
- *
- * @param r {Request} HTTP request object
- * @param bucket {string} S3 bucket associated with request
- * @param accessId {string} User access key credential
- * @param secret {string} Secret access key
- * @returns {string} HTTP Authorization header value
- */
-function signatureV2(r, bucket, credentials) {
-    const method = r.method;
-    /* If the source URI is a directory, we are sending to S3 a query string
-     * local to the root URI, so this is what we need to encode within the
-     * string to sign. For example, if we are requesting /bucket/dir1/ from
-     * nginx, then in S3 we need to request /?delimiter=/&prefix=dir1/
-     * Thus, we can't put the path /dir1/ in the string to sign. */
-    let uri = _isDirectory(r.variables.uri_path) ? '/' : r.variables.uri_path;
-    // To return index pages + index.html
-    if (PROVIDE_INDEX_PAGE && _isDirectory(r.variables.uri_path)){
-        uri = r.variables.uri_path + INDEX_PAGE
-    }
-    const hmac = mod_hmac.createHmac('sha1', credentials.secretAccessKey);
-    const httpDate = s3date(r);
-    const stringToSign = method + '\n\n\n' + httpDate + '\n' + '/' + bucket + uri;
-
-    _debug_log(r, 'AWS v2 Auth Signing String: [' + stringToSign + ']');
-
-    const s3signature = hmac.update(stringToSign).digest('base64');
-
-    return `AWS ${credentials.accessKeyId}:${s3signature}`;
 }
 
 /**
@@ -520,7 +455,7 @@ function signatureV4(r, timestamp, region, server, credentials) {
  */
 function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server) {
     let host = server;
-    const method = r.method;
+    const method = 'POST';//r.method;
     const queryParams = '';
     let uri = lambdaURI(r);
 
