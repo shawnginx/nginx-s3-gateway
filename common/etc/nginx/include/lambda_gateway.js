@@ -14,13 +14,9 @@
  *  limitations under the License.
  */
 
-_require_env_var('S3_BUCKET_NAME');
-_require_env_var('S3_SERVER');
-_require_env_var('S3_SERVER_PROTO');
-_require_env_var('S3_SERVER_PORT');
-_require_env_var('S3_REGION');
-_require_env_var('AWS_SIGS_VERSION');
-_require_env_var('S3_STYLE');
+_require_env_var('LAMBDA_SERVER');
+_require_env_var('LAMBDA_REGION');
+
 
 const mod_hmac = require('crypto');
 const fs = require('fs');
@@ -35,7 +31,6 @@ const ALLOW_LISTING = _parseBoolean(process.env['ALLOW_DIRECTORY_LIST']);
 const PROVIDE_INDEX_PAGE = _parseBoolean(process.env['PROVIDE_INDEX_PAGE']);
 const APPEND_SLASH = _parseBoolean(process.env['APPEND_SLASH_FOR_POSSIBLE_DIRECTORY']);
 const FOUR_O_FOUR_ON_EMPTY_BUCKET = _parseBoolean(process.env['FOUR_O_FOUR_ON_EMPTY_BUCKET']);
-const S3_STYLE = process.env['S3_STYLE'];
 
 const ADDITIONAL_HEADER_PREFIXES_TO_STRIP = _parseArray(process.env['HEADER_PREFIXES_TO_STRIP']);
 
@@ -329,28 +324,6 @@ function lambdaSecurityToken(r) {
 }
 
 /**
- * Build the base file path for a S3 request URI. This function allows for
- * path style S3 URIs to be created that do not use a subdomain to specify
- * the bucket name.
- *
- * @param r {Request} HTTP request object (not used, but required for NGINX configuration)
- * @returns {string} start of the file path for the S3 object URI
- */
-function s3BaseUri(r) {
-    const bucket = process.env['S3_BUCKET_NAME'];
-    let basePath;
-
-    if (S3_STYLE === 'path') {
-        _debug_log(r, 'Using path style uri : ' + '/' + bucket);
-        basePath = '/' + bucket;
-    } else {
-        basePath = '';
-    }
-
-    return basePath;
-}
-
-/**
  * Returns the s3 path given the incoming request
  *
  * @param r HTTP request
@@ -402,26 +375,14 @@ function _s3DirQueryParams(uriPath, method) {
  *
  * @param r {Request} HTTP request object
  */
-function redirectToS3(r) {
+function redirectToLambda(r) {
     // This is a read-only S3 gateway, so we do not support any other methods
     if (!(r.method === 'GET' || r.method === 'HEAD')) {
         _debug_log(r, 'Invalid method requested: ' + r.method);
         r.internalRedirect("@error405");
         return;
     }
-
-    const uriPath = r.variables.uri_path;
-    const isDirectoryListing = ALLOW_LISTING && _isDirectory(uriPath);
-
-    if (isDirectoryListing && r.method === 'GET') {
-        r.internalRedirect("@s3Listing");
-    } else if ( PROVIDE_INDEX_PAGE == true ) {
-        r.internalRedirect("@s3");
-    } else if ( !ALLOW_LISTING && !PROVIDE_INDEX_PAGE && uriPath == "/" ) {
-       r.internalRedirect("@error404");
-    } else {
-        r.internalRedirect("@s3");
-    }
+    r.internalRedirect("@lambda");
 }
 
 function trailslashControl(r) {
@@ -1126,7 +1087,7 @@ export default {
     lambdaSecurityToken,
     lambdaURI,
     trailslashControl,
-    redirectToS3,
+    redirectToLambda,
     editHeaders,
     filterListResponse,
     // These functions do not need to be exposed, but they are exposed so that
