@@ -432,14 +432,17 @@ function signedHeaders(sessionToken) {
 function signatureV4(r, timestamp, region, server, credentials) {
     const eightDigitDate = _eightDigitDate(timestamp);
     const amzDatetime = _amzDatetime(timestamp, eightDigitDate);
-    const signature = _buildSignatureV4(r, amzDatetime, eightDigitDate, credentials, region, server);
-    const authHeader = 'AWS4-HMAC-SHA256 Credential='
-        .concat(credentials.accessKeyId, '/', eightDigitDate, '/', region, '/', SERVICE, '/aws4_request,',
-            'SignedHeaders=', signedHeaders(credentials.sessionToken), ',Signature=', signature);
+    const signature = 'Signature=' + _buildSignatureV4(
+        r, amzDatetime, eightDigitDate, credentials, region, server);
+    const algo = 'AWS4-HMAC-SHA256';
+    const scope = eightDigitDate + '/' + region + '/' + SERVICE + '/aws4_request';
+    const credHead = 'Credential='.concat(credentials.accessKeyId, '/', scope);
+    const signHead = 'SignedHeaders=' + signedHeaders(credentials.sessionToken);
+    const authHead = algo + ' ' + credHead + ',' + signHead + ',' + signature;
 
-    _debug_log(r, 'AWS v4 Auth header: [' + authHeader + ']');
+    _debug_log(r, 'AWS v4 Auth header: [' + authHead + ']');
 
-    return authHeader;
+    return authHead;
 }
 
 /**
