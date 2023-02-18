@@ -158,12 +158,12 @@ server {
         # include /etc/nginx/conf.d/gateway/cors.conf;
 
         # Don't allow any headers from the client - we don't want them messing
-        # with S3 at all.
-        proxy_pass_request_headers off;
+        # with Lambda at all.
+        #proxy_pass_request_headers off;
 
         # Enable passing of the server name through TLS Server Name Indication extension.
         proxy_ssl_server_name on;
-        proxy_ssl_name ${LAMBDA_SERVER};
+        #proxy_ssl_name ${LAMBDA_SERVER};
 
         # Set the Authorization header to the AWS Signatures credentials
         proxy_set_header Authorization $lambdaAuth;
@@ -175,7 +175,6 @@ server {
         # Use keep alive connections in order to improve performance
         proxy_http_version 1.1;
         proxy_set_header Connection '';
-
         proxy_method POST;
 
         # We strip off all of the AWS specific headers from the server so that
@@ -187,8 +186,8 @@ server {
         # gain intelligence about the S3 bucket being proxied.
         proxy_intercept_errors on;
 
-        # Comment out this line to receive the error messages returned by S3
-        error_page 400 401 402 403 405 406 407 408 409 410 411 412 413 414 415 416 417 418 420 422 423 424 426 428 429 431 444 449 450 451 500 501 502 503 504 505 506 507 508 509 510 511 =404 @error404;
+        # Comment out this line to receive the error messages returned by Lambda
+        #error_page 400 401 402 403 405 406 407 408 409 410 411 412 413 414 415 416 417 418 420 422 423 424 426 428 429 431 444 449 450 451 500 501 502 503 504 505 506 507 508 509 510 511 =404 @error404;
 
         #error_page 404 @trailslashControl;
 
