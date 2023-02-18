@@ -335,7 +335,7 @@ function lambdaSecurityToken(r) {
 function lambdaURI(r) {
     let uriPath = r.variables.uri_path;
     let path = _escapeURIPath(uriPath);
-    _debug_log(r, 'Lambda Request URI: ' + r.method + ' ' + path);
+    _debug_log(r, 'AWS Lambda Request URI: ' + path);
     return path;
 }
 
@@ -463,7 +463,8 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
     const queryParams = '';
     let uri = lambdaURI(r);
 
-    const canonicalRequest = _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, creds.sessionToken);
+    const canonicalRequest = _buildCanonicalRequest(
+        method, uri, queryParams, host, amzDatetime, creds.sessionToken);
 
     _debug_log(r, 'AWS v4 Auth Canonical Request: [' + canonicalRequest + ']');
 
