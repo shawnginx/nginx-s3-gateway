@@ -159,7 +159,9 @@ function s3date(r) {
  * @returns {string} ISO 8601 timestamp
  */
 function awsHeaderDate(r) {
-    return _amzDatetime(NOW, _eightDigitDate(NOW));
+    let amzDate = _amzDatetime(NOW, _eightDigitDate(NOW));
+    _debug_log(r, 'AWS Header Date : ' + amzDate);
+    return amzDate;
 }
 
 /**
@@ -326,7 +328,30 @@ function lambdaAuth(r) {
     _debug_log(r, '##### start signatureV4() in lambdaAuth()');
     _debug_log(r, '      + signature v4 : ' + signature);
     _debug_log(r, '');
+
+    //lambdaInvocation(r, signature);
+
     return signature;
+}
+
+async function lambdaInvocation(r, signature) {
+    const endpoint = 'https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0213/invocations';
+    const response = await ngx.fetch(endpoint, {
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': signature,
+            'x-amz-date': awsHeaderDate(r)
+        },
+        method: 'POST',
+        verify: false,
+    });
+    _debug_log(r, '');
+    _debug_log(r, '##### lambdaInvocation() response');
+
+    const resp = await response.json();
+    _debug_log(r, '      + status code : ' + resp.statusCode);
+    _debug_log(r, '      + body        : ' + resp.body);
+    _debug_log(r, '');
 }
 
 /**
@@ -483,13 +508,13 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
 
     const canonicalRequest = _buildCanonicalRequest(
         method, uri, queryParams, host, amzDatetime, creds.sessionToken);
-    _debug_log(r, 'AWS v4 Auth Canonical Request: [\n' + canonicalRequest + '\n]');
+    _debug_log(r, 'AWS v4 Auth Canonical Request:\n' + canonicalRequest + '\n');
 
     const canonicalRequestHash = _hashHex(canonicalRequest);
-    _debug_log(r, 'AWS v4 Auth Canonical Request Hash: [\n' + canonicalRequestHash + '\n]');
+    _debug_log(r, 'AWS v4 Auth Canonical Request Hash:\n' + canonicalRequestHash + '\n');
 
     const stringToSign = _buildStringToSign(amzDatetime, eightDigitDate, region, canonicalRequestHash);
-    _debug_log(r, 'AWS v4 Auth Signing String: [\n' + stringToSign + '\n]');
+    _debug_log(r, 'AWS v4 Auth Signing String:\n' + stringToSign + '\n');
 
     let kSigningHash;
 
@@ -526,12 +551,12 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
         kSigningHash = _buildSignatureKey(creds.secretAccessKey, eightDigitDate, SERVICE, region);
     }
 
-    _debug_log(r, 'AWS v4 Signing Key     : [' + kSigningHash + ']');
-    _debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
+    _debug_log(r, 'AWS v4 Signing Key     :\n' + kSigningHash + '\n');
+    _debug_log(r, 'AWS v4 Signing Key Hash:\n' + kSigningHash.toString('hex') + '\n');
 
     const signature = _hmacHex(kSigningHash, stringToSign);
 
-    _debug_log(r, 'AWS v4 Authorization Header: [' + signature + ']');
+    _debug_log(r, 'AWS v4 Authorization Header:\n' + signature + '\n');
 
     return signature;
 }
@@ -624,21 +649,15 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
 
 // hashing and signing methods
 function _hash(key, msg) {
-    var hmac = mod_hmac.createHmac('sha256', key);
-    hmac.update(msg, 'utf8');
-    return hmac.digest();
+    return mod_hmac.createHmac('sha256', key).update(msg, 'utf8').digest();
 }
 
 function _hmacHex(key, msg) {
-    var hmac = mod_hmac.createHmac('sha256', key);
-    hmac.update(msg, 'utf8');
-    return hmac.digest('hex');
+    return mod_hmac.createHmac('sha256', key).update(msg, 'utf8').digest('hex');
 }
 
 function _hashHex(msg) {
-    var hash = mod_hmac.createHash('sha256');
-    hash.update(msg);
-    return hash.digest('hex');
+    return mod_hmac.createHash('sha256').update(msg).digest('hex');
 }
 
 function _buildSignatureKey(kSecret, eightDigitDate, service, region) {
