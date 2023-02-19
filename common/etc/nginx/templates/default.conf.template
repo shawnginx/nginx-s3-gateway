@@ -149,13 +149,9 @@ server {
     }
 
     location = /2015-03-31/functions/nginx-0219/invocations {
-        auth_request /aws/credentials/retrieve;
-
-        include /etc/nginx/conf.d/gateway/v${AWS_SIGS_VERSION}_headers.conf;
-
         proxy_ssl_server_name on; # For SNI to the Lambda
-        proxy_set_header Authorization $lambdaAuth;
-        proxy_set_header X-Amz-Security-Token $lambdaSecurityToken;
+        proxy_set_header x-amz-date $awsDate;
+        proxy_set_header Authorization $lambda_gateway.lambdaRootAuth;
         proxy_set_body   "";
         proxy_method     POST;
         proxy_pass ${LAMBDA_SERVER_PROTO}://lambda_urls$lambdaURI;

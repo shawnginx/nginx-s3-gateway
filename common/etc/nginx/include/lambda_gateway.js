@@ -331,6 +331,38 @@ function lambdaAuth(r) {
     return signature;
 }
 
+function lambdaRootAuth(r) {
+    const region = process.env['LAMBDA_REGION'];
+    const server = process.env['LAMBDA_SERVER'];
+    let credentials = {
+        accessKeyId: process.env['S3_ACCESS_KEY_ID'],
+        secretAccessKey: process.env['S3_SECRET_KEY'],
+        sessionToken: null,
+        expiration: null
+    }
+    let signature = signatureV4(r, NOW, region, server, credentials);
+
+    _debug_log(r, '');
+    _debug_log(r, '##### start lambdaAuth()');
+    _debug_log(r, '      + read env variables:');
+    _debug_log(r, '        - region          : ' + region);
+    _debug_log(r, '        - server          : ' + server);
+    _debug_log(r, '      + read credentials:');
+    _debug_log(r, '        - accessKeyId     : ' + credentials.accessKeyId);
+    _debug_log(r, '        - secretAccessKey : ' + credentials.secretAccessKey);
+    _debug_log(r, '        - sessionToken    : ' + credentials.sessionToken);
+    _debug_log(r, '        - expiration      : ' + credentials.expiration + '\n\n');
+
+    _debug_log(r, '##### start signatureV4() in lambdaAuth()');
+    _debug_log(r, '      + signature v4 : ' + signature);
+    _debug_log(r, '');
+
+    //lambdaInvocation(r, signature);
+
+    return signature;
+}
+
+
 async function lambdaInvocation(r, signature) {
     const endpoint = 'https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0213/invocations';
     const response = await ngx.fetch(endpoint, {
@@ -1069,6 +1101,7 @@ export default {
     readCredentials,
     writeCredentials,
     s3date,
+    lambdaRootAuth,
     lambdaAuth,
     lambdaSecurityToken,
     lambdaURI,
