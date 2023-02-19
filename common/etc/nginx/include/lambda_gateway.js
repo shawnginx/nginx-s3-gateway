@@ -343,7 +343,7 @@ function lambdaRootAuth(r) {
     let signature = signatureV4(r, NOW, region, server, credentials);
 
     _debug_log(r, '');
-    _debug_log(r, '##### start lambdaAuth()');
+    _debug_log(r, '##### start lambdaRootAuth()');
     _debug_log(r, '      + read env variables:');
     _debug_log(r, '        - region          : ' + region);
     _debug_log(r, '        - server          : ' + server);
@@ -353,7 +353,7 @@ function lambdaRootAuth(r) {
     _debug_log(r, '        - sessionToken    : ' + credentials.sessionToken);
     _debug_log(r, '        - expiration      : ' + credentials.expiration + '\n\n');
 
-    _debug_log(r, '##### start signatureV4() in lambdaAuth()');
+    _debug_log(r, '##### start signatureV4() in lambdaRootAuth()');
     _debug_log(r, '      + signature v4 : ' + signature);
     _debug_log(r, '');
 
