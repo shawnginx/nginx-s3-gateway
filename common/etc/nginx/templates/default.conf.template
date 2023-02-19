@@ -159,7 +159,7 @@ server {
 
         # Don't allow any headers from the client - we don't want them messing
         # with Lambda at all.
-        #proxy_pass_request_headers off;
+        proxy_pass_request_headers off;
 
         # Enable passing of the server name through TLS Server Name Indication extension.
         proxy_ssl_server_name on;

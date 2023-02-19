@@ -285,6 +285,8 @@ function _readCredentialsFromFile() {
 
     try {
         const creds = fs.readFileSync(credsFilePath);
+        creds.sessionToken = null;
+        creds.expiration = null;
         return JSON.parse(creds);
     } catch (e) {
         /* Do not throw an exception in the case of when the
@@ -309,6 +311,17 @@ function lambdaAuth(r) {
     let server = process.env['LAMBDA_SERVER'];
     const credentials = readCredentials(r);
     let signature = signatureV4(r, NOW, region, server, credentials);
+
+    _debug_log(r, '##### start lambdaAuth()');
+    _debug_log(r, '      + read credentials:');
+    _debug_log(r, '        - accessKeyId     : ' + credentials.accessKeyId);
+    _debug_log(r, '        - secretAccessKey : ' + credentials.secretAccessKey);
+    _debug_log(r, '        - sessionToken    : ' + credentials.sessionToken);
+    _debug_log(r, '        - expiration      : ' + credentials.expiration + '\n\n');
+
+    _debug_log(r, '##### start signatureV4() in lambdaAuth()');
+    _debug_log(r, '      + signature v4 : ' + signature);
+    _debug_log(r, '');
     return signature;
 }
 
@@ -513,6 +526,7 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
         kSigningHash = _buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
     }
 
+    _debug_log(r, 'AWS v4 Signing Key     : [' + kSigningHash + ']');
     _debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
 
     const signature = mod_hmac.createHmac('sha256', kSigningHash)
@@ -608,16 +622,14 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
  * @returns {ArrayBuffer} signing HMAC
  * @private
  */
+function _sign(key, val) {
+    return mod_hmac.createHmac('sha256', key).update(val).digest();
+}
 function _buildSigningKeyHash(kSecret, eightDigitDate, service, region) {
-    const kDate = mod_hmac.createHmac('sha256', 'AWS4'.concat(kSecret))
-        .update(eightDigitDate).digest();
-    const kRegion = mod_hmac.createHmac('sha256', kDate)
-        .update(region).digest();
-    const kService = mod_hmac.createHmac('sha256', kRegion)
-        .update(service).digest();
-    const kSigning = mod_hmac.createHmac('sha256', kService)
-        .update('aws4_request').digest();
-
+    const kDate = _sign('AWS4'.concat(kSecret), eightDigitDate);
+    const kRegion = _sign(kDate, region);
+    const kService = _sign(kRegion, service);
+    const kSigning = _sign(kService, 'aws4_request');
     return kSigning;
 }
 
