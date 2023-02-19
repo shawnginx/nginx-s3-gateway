@@ -164,7 +164,7 @@ function testBuildSigningKeyHashWithReferenceInputs() {
     var service = 'iam';
     var region = 'us-east-1';
     var expected = 'c4afb1cc5771d871763a393e44b703571b55cc28424d1a5e86da6ed3c154a4b9';
-    var signingKeyHash = s3gateway._buildSigningKeyHash(kSecret, date, service, region).toString('hex');
+    var signingKeyHash = s3gateway._buildSignatureKey(kSecret, date, service, region).toString('hex');
 
     if (signingKeyHash !== expected) {
         throw 'Signing key hash was not created correctly.\n' +
@@ -180,7 +180,7 @@ function testBuildSigningKeyHashWithTestSuiteInputs() {
     var service = 's3';
     var region = 'us-west-2';
     var expected = 'a48701bfe803103e89051f55af2297dd76783bbceb5eb416dab71e0eadcbc4f6';
-    var signingKeyHash = s3gateway._buildSigningKeyHash(kSecret, date, service, region).toString('hex');
+    var signingKeyHash = s3gateway._buildSignatureKey(kSecret, date, service, region).toString('hex');
 
     if (signingKeyHash !== expected) {
         throw 'Signing key hash was not created correctly.\n' +

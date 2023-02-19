@@ -647,13 +647,13 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, bucket, region
             kSigningHash = Buffer.from(JSON.parse(fields[1]));
         // Otherwise, generate a new signing key hash and store it in the cache
         } else {
-            kSigningHash = _buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
+            kSigningHash = _buildSignatureKey(creds.secretAccessKey, eightDigitDate, SERVICE, region);
             _debug_log(r, 'Writing key: ' + eightDigitDate + ':' + kSigningHash.toString('hex'));
             r.variables.signing_key_hash = eightDigitDate + ':' + JSON.stringify(kSigningHash);
         }
     // Otherwise, don't use caching at all (like when we are using NGINX OSS)
     } else {
-        kSigningHash = _buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
+        kSigningHash = _buildSignatureKey(creds.secretAccessKey, eightDigitDate, SERVICE, region);
     }
 
     _debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
@@ -751,7 +751,7 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
  * @returns {ArrayBuffer} signing HMAC
  * @private
  */
-function _buildSigningKeyHash(kSecret, eightDigitDate, service, region) {
+function _buildSignatureKey(kSecret, eightDigitDate, service, region) {
     const kDate = mod_hmac.createHmac('sha256', 'AWS4'.concat(kSecret))
         .update(eightDigitDate).digest();
     const kRegion = mod_hmac.createHmac('sha256', kDate)
@@ -1182,7 +1182,7 @@ export default {
     _eightDigitDate,
     _amzDatetime,
     _splitCachedValues,
-    _buildSigningKeyHash,
+    _buildSignatureKey,
     _buildSignatureV4,
     _escapeURIPath,
     _parseArray,

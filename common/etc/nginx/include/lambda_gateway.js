@@ -308,11 +308,15 @@ function _readCredentialsFromFile() {
  */
 function lambdaAuth(r) {
     const region = process.env['LAMBDA_REGION'];
-    let server = process.env['LAMBDA_SERVER'];
+    const server = process.env['LAMBDA_SERVER'];
     const credentials = readCredentials(r);
     let signature = signatureV4(r, NOW, region, server, credentials);
 
+    _debug_log(r, '');
     _debug_log(r, '##### start lambdaAuth()');
+    _debug_log(r, '      + read env variables:');
+    _debug_log(r, '        - region          : ' + region);
+    _debug_log(r, '        - server          : ' + server);
     _debug_log(r, '      + read credentials:');
     _debug_log(r, '        - accessKeyId     : ' + credentials.accessKeyId);
     _debug_log(r, '        - secretAccessKey : ' + credentials.secretAccessKey);
@@ -421,8 +425,9 @@ function filterListResponse(r, data, flags) {
  *
  * @param sessionToken {string|undefined} AWS session token if present
  * @returns {string} semicolon delimited string of the headers needed for signing
+ * @private
  */
-function signedHeaders(sessionToken) {
+function _signedHeaders(sessionToken) {
     let headers = DEFAULT_SIGNED_HEADERS;
     if (sessionToken) {
         headers += ';x-amz-security-token';
@@ -450,7 +455,7 @@ function signatureV4(r, timestamp, region, server, credentials) {
     const algo = 'AWS4-HMAC-SHA256';
     const scope = eightDigitDate + '/' + region + '/' + SERVICE + '/aws4_request';
     const credHead = 'Credential='.concat(credentials.accessKeyId, '/', scope);
-    const signHead = 'SignedHeaders=' + signedHeaders(credentials.sessionToken);
+    const signHead = 'SignedHeaders=' + _signedHeaders(credentials.sessionToken);
     const authHead = algo + ' ' + credHead + ',' + signHead + ',' + signature;
 
     _debug_log(r, 'AWS v4 Auth header: [' + authHead + ']');
@@ -478,18 +483,13 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
 
     const canonicalRequest = _buildCanonicalRequest(
         method, uri, queryParams, host, amzDatetime, creds.sessionToken);
+    _debug_log(r, 'AWS v4 Auth Canonical Request: [\n' + canonicalRequest + '\n]');
 
-    _debug_log(r, 'AWS v4 Auth Canonical Request: [' + canonicalRequest + ']');
-
-    const canonicalRequestHash = mod_hmac.createHash('sha256')
-        .update(canonicalRequest)
-        .digest('hex');
-
-    _debug_log(r, 'AWS v4 Auth Canonical Request Hash: [' + canonicalRequestHash + ']');
+    const canonicalRequestHash = _hashHex(canonicalRequest);
+    _debug_log(r, 'AWS v4 Auth Canonical Request Hash: [\n' + canonicalRequestHash + '\n]');
 
     const stringToSign = _buildStringToSign(amzDatetime, eightDigitDate, region, canonicalRequestHash);
-
-    _debug_log(r, 'AWS v4 Auth Signing String: [' + stringToSign + ']');
+    _debug_log(r, 'AWS v4 Auth Signing String: [\n' + stringToSign + '\n]');
 
     let kSigningHash;
 
@@ -517,20 +517,19 @@ function _buildSignatureV4(r, amzDatetime, eightDigitDate, creds, region, server
             kSigningHash = Buffer.from(JSON.parse(fields[1]));
         // Otherwise, generate a new signing key hash and store it in the cache
         } else {
-            kSigningHash = _buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
+            kSigningHash = _buildSignatureKey(creds.secretAccessKey, eightDigitDate, SERVICE, region);
             _debug_log(r, 'Writing key: ' + eightDigitDate + ':' + kSigningHash.toString('hex'));
             r.variables.signing_key_hash = eightDigitDate + ':' + JSON.stringify(kSigningHash);
         }
     // Otherwise, don't use caching at all (like when we are using NGINX OSS)
     } else {
-        kSigningHash = _buildSigningKeyHash(creds.secretAccessKey, eightDigitDate, SERVICE, region);
+        kSigningHash = _buildSignatureKey(creds.secretAccessKey, eightDigitDate, SERVICE, region);
     }
 
     _debug_log(r, 'AWS v4 Signing Key     : [' + kSigningHash + ']');
     _debug_log(r, 'AWS v4 Signing Key Hash: [' + kSigningHash.toString('hex') + ']');
 
-    const signature = mod_hmac.createHmac('sha256', kSigningHash)
-        .update(stringToSign).digest('hex');
+    const signature = _hmacHex(kSigningHash, stringToSign);
 
     _debug_log(r, 'AWS v4 Authorization Header: [' + signature + ']');
 
@@ -601,12 +600,12 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
         canonicalHeaders += 'x-amz-security-token:' + sessionToken + '\n'
     }
 
-    let canonicalRequest = method + '\n';
-    canonicalRequest += uri + '\n';
-    canonicalRequest += queryParams + '\n';
-    canonicalRequest += canonicalHeaders + '\n';
-    canonicalRequest += signedHeaders(sessionToken) + '\n';
-    canonicalRequest += EMPTY_PAYLOAD_HASH;
+    let canonicalRequest = method + '\n' +
+                           uri + '\n' +
+                           queryParams + '\n' +
+                           canonicalHeaders + '\n' +
+                           _signedHeaders(sessionToken) + '\n' +
+                           EMPTY_PAYLOAD_HASH;
 
     return canonicalRequest;
 }
@@ -622,14 +621,31 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
  * @returns {ArrayBuffer} signing HMAC
  * @private
  */
-function _sign(key, val) {
-    return mod_hmac.createHmac('sha256', key).update(val).digest();
+
+// hashing and signing methods
+function _hash(key, msg) {
+    var hmac = mod_hmac.createHmac('sha256', key);
+    hmac.update(msg, 'utf8');
+    return hmac.digest();
 }
-function _buildSigningKeyHash(kSecret, eightDigitDate, service, region) {
-    const kDate = _sign('AWS4'.concat(kSecret), eightDigitDate);
-    const kRegion = _sign(kDate, region);
-    const kService = _sign(kRegion, service);
-    const kSigning = _sign(kService, 'aws4_request');
+
+function _hmacHex(key, msg) {
+    var hmac = mod_hmac.createHmac('sha256', key);
+    hmac.update(msg, 'utf8');
+    return hmac.digest('hex');
+}
+
+function _hashHex(msg) {
+    var hash = mod_hmac.createHash('sha256');
+    hash.update(msg);
+    return hash.digest('hex');
+}
+
+function _buildSignatureKey(kSecret, eightDigitDate, service, region) {
+    const kDate = _hash('AWS4'.concat(kSecret), eightDigitDate);
+    const kRegion = _hash(kDate, region);
+    const kService = _hash(kRegion, service);
+    const kSigning = _hash(kService, 'aws4_request');
     return kSigning;
 }
 
@@ -1051,7 +1067,7 @@ export default {
     _eightDigitDate,
     _amzDatetime,
     _splitCachedValues,
-    _buildSigningKeyHash,
+    _buildSignatureKey,
     _buildSignatureV4,
     _escapeURIPath,
     _parseArray,
