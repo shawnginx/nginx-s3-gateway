@@ -25,6 +25,7 @@ js_set $s3SecurityToken     s3gateway.s3SecurityToken;
 js_set $s3uri               s3gateway.s3uri;
 
 js_set $lambdaAuth          lambda_gateway.lambdaAuth;
+js_set $lambdaRootAuth      lambda_gateway.lambdaRootAuth;
 js_set $lambdaSecurityToken lambda_gateway.lambdaSecurityToken;
 js_set $lambdaURI           lambda_gateway.lambdaURI;
 
@@ -151,7 +152,7 @@ server {
     location = /2015-03-31/functions/nginx-0219/invocations {
         proxy_ssl_server_name on; # For SNI to the Lambda
         proxy_set_header x-amz-date $awsDate;
-        proxy_set_header Authorization $lambda_gateway.lambdaRootAuth;
+        proxy_set_header Authorization $lambdaRootAuth;
         proxy_set_body   "";
         proxy_method     POST;
         proxy_pass ${LAMBDA_SERVER_PROTO}://lambda_urls$lambdaURI;
