@@ -65,8 +65,7 @@ const EMPTY_PAYLOAD_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495
  * Constant defining the headers being signed.
  * @type {string}
  */
-//const DEFAULT_SIGNED_HEADERS = 'host;x-amz-content-sha256;x-amz-date';
-const DEFAULT_SIGNED_HEADERS = 'host;x-amz-date';
+const DEFAULT_SIGNED_HEADERS = 'host;x-amz-content-sha256;x-amz-date';
 
 /**
  * Constant base URI to fetch credentials together with the credentials relative URI, see
@@ -287,8 +286,6 @@ function _readCredentialsFromFile() {
 
     try {
         const creds = fs.readFileSync(credsFilePath);
-        creds.sessionToken = null;
-        creds.expiration = null;
         return JSON.parse(creds);
     } catch (e) {
         /* Do not throw an exception in the case of when the
@@ -618,7 +615,7 @@ function _buildStringToSign(amzDatetime, eightDigitDate, region, canonicalReques
  */
 function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, sessionToken) {
     let canonicalHeaders = 'host:' + host + '\n' +
-        //'x-amz-content-sha256:' + EMPTY_PAYLOAD_HASH + '\n' +
+        'x-amz-content-sha256:' + EMPTY_PAYLOAD_HASH + '\n' +
         'x-amz-date:' + amzDatetime + '\n';
 
     if (sessionToken) {
@@ -649,15 +646,15 @@ function _buildCanonicalRequest(method, uri, queryParams, host, amzDatetime, ses
 
 // hashing and signing methods
 function _hash(key, msg) {
-    return mod_hmac.createHmac('sha256', key).update(msg, 'utf8').digest();
+    return mod_hmac.createHmac('sha256', key).update(msg, 'utf-8').digest();
 }
 
 function _hmacHex(key, msg) {
-    return mod_hmac.createHmac('sha256', key).update(msg, 'utf8').digest('hex');
+    return mod_hmac.createHmac('sha256', key).update(msg, 'utf-8').digest('hex');
 }
 
 function _hashHex(msg) {
-    return mod_hmac.createHash('sha256').update(msg).digest('hex');
+    return mod_hmac.createHash('sha256').update(msg, 'utf-8').digest('hex');
 }
 
 function _buildSignatureKey(kSecret, eightDigitDate, service, region) {
