@@ -362,14 +362,51 @@ function lambdaRootAuth(r) {
     return signature;
 }
 
+async function validateLambdaRootAuth(r) {
+    const region = process.env['LAMBDA_REGION'];
+    const server = process.env['LAMBDA_SERVER'];
+    let credentials = {
+        accessKeyId: process.env['S3_ACCESS_KEY_ID'],
+        secretAccessKey: process.env['S3_SECRET_KEY'],
+        sessionToken: null,
+        expiration: null
+    }
+    let signature = signatureV4(r, NOW, region, server, credentials);
+
+    _debug_log(r, '');
+    _debug_log(r, '##### start validateLambdaRootAuth()');
+    _debug_log(r, '      + read env variables:');
+    _debug_log(r, '        - region          : ' + region);
+    _debug_log(r, '        - server          : ' + server);
+    _debug_log(r, '      + read credentials:');
+    _debug_log(r, '        - accessKeyId     : ' + credentials.accessKeyId);
+    _debug_log(r, '        - secretAccessKey : ' + credentials.secretAccessKey);
+    _debug_log(r, '        - sessionToken    : ' + credentials.sessionToken);
+    _debug_log(r, '        - expiration      : ' + credentials.expiration + '\n\n');
+
+    _debug_log(r, '##### start signatureV4() in validateLambdaRootAuth()');
+    _debug_log(r, '      + signature v4 : ' + signature);
+    _debug_log(r, '');
+
+    try {
+        await lambdaInvocation(r, signature);
+    } catch (e) {
+        _debug_log(r, 'Could not invoke a Lambda function: ' + JSON.stringify(e));
+        r.return(500);
+        return;
+    }
+    r.return(200);
+    return;
+}
 
 async function lambdaInvocation(r, signature) {
-    const endpoint = 'https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0213/invocations';
+    const endpoint = 'https://lambda.us-east-2.amazonaws.com/2015-03-31/functions/nginx-0220/invocations';
     const response = await ngx.fetch(endpoint, {
         headers: {
-            'Accept': 'application/json',
+            //'Accept': 'application/json',
             'Authorization': signature,
-            'x-amz-date': awsHeaderDate(r)
+            'x-amz-date': awsHeaderDate(r),
+            'x-amz-content-sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
         },
         method: 'POST',
         verify: false,
@@ -381,6 +418,10 @@ async function lambdaInvocation(r, signature) {
     _debug_log(r, '      + status code : ' + resp.statusCode);
     _debug_log(r, '      + body        : ' + resp.body);
     _debug_log(r, '');
+    if (!resp.ok) {
+        throw 'Lambda invocation response was not ok.';
+    }
+
 }
 
 /**
@@ -1109,6 +1150,7 @@ export default {
     redirectToLambda,
     editHeaders,
     filterListResponse,
+    validateLambdaRootAuth,
     // These functions do not need to be exposed, but they are exposed so that
     // unit tests can run against them.
     _padWithLeadingZeros,

@@ -158,6 +158,15 @@ server {
         proxy_pass ${LAMBDA_SERVER_PROTO}://lambda_urls$lambdaURI;
     }
 
+    location = /2015-03-31/functions/nginx-0220/invocations {
+        auth_request /aws/lambda/validation;
+    }
+
+    location = /aws/lambda/validation {
+        js_content lambda_gateway.validateLambdaRootAuth;
+        include /etc/nginx/conf.d/gateway/js_fetch_trusted_certificate.conf;
+    }
+
     location @lambda {
         # We include only the headers needed for the authentication signatures that
         # we plan to use.
