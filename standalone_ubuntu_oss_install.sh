@@ -62,7 +62,7 @@ elif curl --output /dev/null --silent --head --fail --connect-timeout 2 "http://
   echo "Running inside an EC2 instance, using IMDS for credentials"
   uses_iam_creds=1
 else
-  required+=("S3_ACCESS_KEY_ID" "S3_SECRET_KEY")
+  required+=("S3_ACCESS_KEY_ID" "S3_SECRET_KEY" "S3_SESSION_TOKEN")
   uses_iam_creds=0
 fi
 
@@ -205,6 +205,8 @@ if [ $uses_iam_creds -eq 0 ]; then
 S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
 # AWS Secret access key
 S3_SECRET_KEY=${S3_SECRET_KEY}
+# AWS Session Token
+S3_SESSION_TOKEN=${S3_SESSION_TOKEN}
 EOF
 fi
 
@@ -304,6 +306,7 @@ if [ $uses_iam_creds -eq 0 ]; then
   cat >> "/etc/nginx/environment" << EOF
 env S3_ACCESS_KEY_ID;
 env S3_SECRET_KEY;
+env S3_SESSION_TOKEN;
 EOF
 fi
 
